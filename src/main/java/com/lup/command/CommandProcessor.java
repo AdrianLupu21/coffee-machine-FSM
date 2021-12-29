@@ -7,11 +7,9 @@ import com.lup.coffee.InvalidCoffeeException;
 import com.lup.exceptions.InvalidInputException;
 import com.lup.machine.CoffeeMaker;
 import com.lup.machine.InsuficientIngredientsException;
+import com.lup.utils.CommandLineTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.HashSet;
-import java.util.Set;
 
 import static com.lup.States.*;
 import static com.lup.utils.CommandLineTools.requestMoney;
@@ -20,22 +18,11 @@ public class CommandProcessor implements Runnable{
 
     public static final Logger logger = LoggerFactory.getLogger(CommandProcessor.class);
 
-    Set<String> availableCommands = new HashSet<>();
-
-    private void initCommands(){
-        availableCommands.add("exit");
-    }
-
-    public void executeCommand(String command){
-
-    }
-
-
     @Override
     public void run() {
         CoffeeMaker coffeeMaker = CoffeeMaker.getInstance();
         try {
-            while (true) {
+            while (coffeeMaker.isTurnedOn()) {
                 Commands commands = CommandChannel.commandChannelActions.getCommandFromChannel();
                 if(commands != null) {
                     switch (commands) {
@@ -46,18 +33,18 @@ public class CommandProcessor implements Runnable{
                                 logger.info("please specify the amount of money");
                                 try {
                                     var diff = requestMoney();
-                                    if(diff < 0){
+                                    if (diff < 0) {
                                         logger.info("you still need to introduce {} in order to pay for a {}", Math.abs(diff), coffeeMaker.getSelectedCoffee());
                                         coffeeMaker.currentState = PAYMENT;
-                                    }else{
+                                    } else {
                                         CoffeeFactory.buildCoffee(coffeeMaker.getSelectedCoffee());
                                         coffeeMaker.removeMoney(coffeeMaker.getSelectedCoffee().getPrice());
                                         logger.info("coffee {} was made, you may pick it up", coffeeMaker.getSelectedCoffee());
                                         coffeeMaker.currentState = IDLE;
                                         coffeeMaker.setSelectedCoffee(Coffee.NONE);
                                     }
-                                } catch (InvalidInputException | InvalidCoffeeException e) {
-                                    e.printStackTrace();
+                                } catch (InvalidInputException | InvalidCoffeeException | InsuficientIngredientsException e) {
+                                    logger.error(e.getMessage());
                                     coffeeMaker.currentState = PAYMENT;
                                 }
                             }
@@ -98,13 +85,39 @@ public class CommandProcessor implements Runnable{
                                     if(!sugarLevel.isEmpty())
                                         coffeeMaker.setSugarLevel(Byte.parseByte(sugarLevel));
                                     coffeeMaker.currentState = PAYMENT;
-                                    logger.info("please add money");
+                                    logger.info("please add money with the command \"add money\"");
                                 } catch (InvalidInputException e) {
                                     e.printStackTrace();
                                     coffeeMaker.currentState = CONFIRMATION;
                                 }
                             }
                             break;
+                        case GO_BACK:
+                            if(coffeeMaker.currentState.equals(PAYMENT)){
+                                coffeeMaker.currentState = CONFIRMATION;
+                            }else if(coffeeMaker.currentState.equals(CONFIRMATION)){
+                                coffeeMaker.currentState = IDLE;
+                            }else{
+                                logger.error("Cannot go back from state {}", coffeeMaker.currentState);
+                            }
+                            break;
+                        case GET_REST:
+                            coffeeMaker.currentState = MONEY_CHECK;
+                            if(coffeeMaker.getCurrentSumOfMoney() > 0){
+                                coffeeMaker.currentState = BANKNOTE_CHECK;
+                                if(CommandLineTools.randomCheck()){
+                                    coffeeMaker.currentState = MONEY_BACK_CASH;
+                                }else{
+                                    logger.info("The machine does not have sufficient banknotes to perform this action." +
+                                            " A voucher will be provided");
+                                    coffeeMaker.currentState = QR_SHOW;
+                                }
+                                coffeeMaker.returnAllMoney();
+                            }else{
+                                logger.info("The current sold of the machine is {}. Unable to provide the return of " +
+                                        "money", coffeeMaker.getCurrentSumOfMoney());
+                            }
+                            coffeeMaker.currentState = IDLE;
                         case STATUS:
                             logger.info("\ncurrent state: {}\n" +
                                         "sold: {}\n" +
@@ -117,9 +130,7 @@ public class CommandProcessor implements Runnable{
                 }
             }
         }catch(InterruptedException e){
-            e.printStackTrace();
-        } catch (InsuficientIngredientsException e) {
-            e.printStackTrace();
+           logger.info("Thread {} was interrupted", Thread.currentThread().getName());
         }
         logger.info("Thread {}, has died", Thread.currentThread().getName());
     }

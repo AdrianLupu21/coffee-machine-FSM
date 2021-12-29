@@ -2,19 +2,42 @@ package com.lup.machine;
 
 import com.lup.States;
 import com.lup.coffee.Coffee;
+import com.lup.command.CommandChannel;
 import com.lup.exceptions.InvalidInputException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.lup.utils.CommandLineTools.randomCheck;
+
 public class CoffeeMaker {
+
+    private enum PaymentMethod{
+        CASH,
+        VOUCHER,
+        CARD,
+        UNAVAILABLE;
+
+        static PaymentMethod getPaymentMethod(String paymentMethod){
+            if(paymentMethod.equalsIgnoreCase("card")){
+                return CARD;
+            }else if(paymentMethod.equalsIgnoreCase("voucher")){
+                return VOUCHER;
+            }else if(paymentMethod.equalsIgnoreCase("cash")){
+                return CASH;
+            }else {
+                return UNAVAILABLE;
+            }
+        }
+
+    }
 
     public static final Logger logger = LoggerFactory.getLogger(CoffeeMaker.class);
 
-    private boolean isTurnedOn = false;
+    private volatile boolean isTurnedOn = false;
     public States currentState = States.IDLE;
     public int currentSumOfMoney;
-    public int coffeeQuantity = 100;
-    public int sugarQuantity = 10;
+    public volatile int coffeeQuantity = 100;
+    public volatile int sugarQuantity = 10;
     private static CoffeeMaker coffeeMaker;
     private Coffee selectedCoffee = Coffee.NONE;
     private byte sugarLevel;
@@ -45,7 +68,40 @@ public class CoffeeMaker {
             logger.info("removing {} from the account", sumToRemove);
             currentSumOfMoney -= sumToRemove;
         }
+    }
 
+    public static boolean requestPaymentMethod() throws InterruptedException {
+        logger.info("Please provide the payment method. card/cash/voucher");
+        coffeeMaker.currentState = States.WAIT_FOR_INPUT;
+        synchronized (Thread.currentThread()) {
+            Thread.currentThread().wait();
+        }
+        PaymentMethod paymentMethod = PaymentMethod.getPaymentMethod(CommandChannel.commandChannelActions.getArgumentFromQueue());
+
+        if(paymentMethod.equals(PaymentMethod.CARD) && !randomCheck()){
+            coffeeMaker.currentState = States.PAYMENT;
+            logger.error("Payment with card was rejected");
+            return false;
+        }else if (paymentMethod.equals(PaymentMethod.CASH) && !randomCheck(5)){
+            logger.error("Payment with cash was rejected");
+            coffeeMaker.currentState = States.PAYMENT;
+            return false;
+        }else if (paymentMethod.equals(PaymentMethod.VOUCHER)){
+            logger.info("payment with {}", PaymentMethod.VOUCHER);
+            coffeeMaker.currentState = States.PAYMENT;
+            return true;
+        }else if (paymentMethod.equals(PaymentMethod.UNAVAILABLE)){
+            coffeeMaker.currentState = States.PAYMENT;
+            return false;
+        }
+        coffeeMaker.currentState = States.PAYMENT;
+        logger.info("payment with {}", paymentMethod);
+        return true;
+    }
+
+    public void returnAllMoney(){
+        logger.info("Returning all money from the current sold");
+        currentSumOfMoney = 0;
     }
 
     public int extractSugar(int sugar) throws InsuficientIngredientsException {

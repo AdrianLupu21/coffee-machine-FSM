@@ -5,8 +5,8 @@ public enum States {
     CONFIRMATION,
     PAYMENT,
     PREPARATION,
-    MONEY_CHECK,
-    MONEY_BACK_CHECK,
+    MONEY_CHECK, // state which describes the verification of the current sold
+    BANKNOTE_CHECK, // state which describes the verification of the physical banknotes inside the machine
     UNAVAILABLE,
     CASH_PAYMENT_CHECK,
     MONEY_BACK_CASH,

@@ -1,7 +1,5 @@
 package com.lup.coffee;
 
-import com.lup.machine.CoffeeMaker;
-
 // TODO add multiple ingredients for this method to make sense
 public class CoffeeBuilder{
     private final int sugarQuantity;
