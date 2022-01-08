@@ -7,7 +7,7 @@ A Finite State Machine modeled after a coffee vending machine.
 * [JUnit 5](https://junit.org/junit5/)
 * [JDK 11](https://www.oracle.com/java/technologies/javase/jdk11-archive-downloads.html)
 
-<p>The program runs inside a loop until the user enter the "exit" command. There are 3 threads running in parallel, the main thread,
+<p>The program runs inside a loop until the user enters the "exit" command. There are 3 threads running in parallel, the main thread,
 a thread used to check the state of the ingredients, and a thread used to process user commands. A publish-subscribe design pattern was used
 for the communication between the main thread and the thread used for command processing. There are two queues used for commands and arguments.
 The main thread receives a command from the console. The command is published to the queue and then the processor thread will consume the command.
